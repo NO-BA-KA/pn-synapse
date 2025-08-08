@@ -1,0 +1,23 @@
+<!doctype html><html><head>
+<meta charset="utf-8"><title>Gardeners Console</title>
+<style>body{font-family:system-ui;margin:24px}.card{border:1px solid #ddd;border-radius:12px;padding:16px}</style>
+</head><body>
+<h1>Gardeners Console (MVP)</h1>
+<div class="card">
+  <label>Paper ID: <input id="paper_id" value="urn:pn:paper:demo-001" style="min-width:320px"></label>
+  <button onclick="integrate()">Integrate</button>
+  <button onclick="sync()">Sync</button>
+  <pre id="out"></pre>
+</div>
+<script>
+async function integrate(){
+  const id=document.getElementById('paper_id').value;
+  const r=await fetch(`http://localhost:8000/integrate/${encodeURIComponent(id)}`,{method:'POST'});
+  document.getElementById('out').textContent=JSON.stringify(await r.json(),null,2);
+}
+async function sync(){
+  const r=await fetch('http://localhost:8000/sync');
+  document.getElementById('out').textContent=JSON.stringify(await r.json(),null,2);
+}
+</script>
+</body></html>

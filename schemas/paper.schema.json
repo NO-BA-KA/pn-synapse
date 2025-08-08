@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "type",
+    "id",
+    "title",
+    "claims",
+    "provenance"
+  ],
+  "properties": {
+    "type": {
+      "const": "Paper"
+    },
+    "id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Claim"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Evidence"
+      }
+    },
+    "graphPatch": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/GraphPatch"
+      }
+    },
+    "repro": {
+      "$ref": "#/$defs/Repro"
+    },
+    "provenance": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "Claim": {
+      "type": "object",
+      "required": [
+        "id",
+        "text"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "topic": {
+          "type": "string"
+        }
+      }
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "license": {
+          "type": "string"
+        }
+      }
+    },
+    "GraphPatch": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "enum": [
+            "add",
+            "remove"
+          ]
+        },
+        "triple": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Repro": {
+      "type": "object",
+      "properties": {
+        "code_hash": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "runner": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

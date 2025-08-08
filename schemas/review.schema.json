@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "paper_id",
+    "reviewer",
+    "vote"
+  ],
+  "properties": {
+    "paper_id": {
+      "type": "string"
+    },
+    "reviewer": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "pubkey": {
+          "type": "string"
+        }
+      }
+    },
+    "vote": {
+      "enum": [
+        "approve",
+        "reject",
+        "request_changes"
+      ]
+    },
+    "weight": {
+      "type": "number"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "topic": {
+      "type": "string"
+    }
+  }
+}

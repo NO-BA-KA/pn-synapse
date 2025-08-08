@@ -5,6 +5,7 @@ app_module = importlib.import_module("synapse_app")
 app = getattr(app_module, "app")
 client = TestClient(app)
 
+
 def test_health():
     r = client.get("/healthz")
     assert r.status_code == 200

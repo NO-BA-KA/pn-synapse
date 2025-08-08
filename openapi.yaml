@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: PN Synapse Alpha API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /healthz:
+    get:
+      responses:
+        '200':
+          description: OK
+  /publish:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Paper'
+      responses:
+        '202':
+          description: Accepted
+  /review:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Review'
+      responses:
+        '200':
+          description: Recorded
+  /integrate/{paper_id}:
+    post:
+      parameters:
+        - name: paper_id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Integrated}
+  /broadcast:
+    post:
+      responses:
+        '200': {description: Queued}
+  /sync:
+    get:
+      parameters:
+        - name: since
+          in: query
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Events
+components:
+  schemas:
+    DID:
+      type: object
+      properties: {id: {type: string}, pubkey: {type: string}}
+    Claim:
+      type: object
+      required: [id, text]
+      properties: {id: {type: string}, text: {type: string}, topic: {type: string}}
+    Evidence:
+      type: object
+      properties: {url: {type: string}, hash: {type: string}, license: {type: string}}
+    Repro:
+      type: object
+      properties: {code_hash: {type: string}, data_hash: {type: string}, runner: {type: string}}
+    Triple:
+      type: array
+      minItems: 3
+      maxItems: 3
+      items: {type: string}
+    GraphPatch:
+      type: object
+      properties: {op: {type: string, enum: [add, remove]}, triple: {$ref: '#/components/schemas/Triple'}}
+    Paper:
+      type: object
+      required: [type, id, title, claims, provenance]
+      properties:
+        type: {type: string, enum: [Paper]}
+        id: {type: string}
+        title: {type: string}
+        abstract: {type: string}
+        authors: {type: array, items: {$ref: '#/components/schemas/DID'}}
+        claims: {type: array, items: {$ref: '#/components/schemas/Claim'}}
+        evidence: {type: array, items: {$ref: '#/components/schemas/Evidence'}}
+        graphPatch: {type: array, items: {$ref: '#/components/schemas/GraphPatch'}}
+        repro: {$ref: '#/components/schemas/Repro'}
+        provenance: {type: object}
+    Review:
+      type: object
+      required: [paper_id, reviewer, vote]
+      properties:
+        paper_id: {type: string}
+        reviewer: {$ref: '#/components/schemas/DID'}
+        vote: {type: string, enum: [approve, reject, request_changes]}
+        weight: {type: number}
+        notes: {type: string}
+        topic: {type: string}
+    BroadcastEvent:
+      type: object
+      required: [id, kind, payload, created_at]
+      properties:
+        id: {type: string}
+        kind: {type: string, enum: [graph_patch, policy, rollback]}
+        payload: {type: object}
+        created_at: {type: string, format: date-time}

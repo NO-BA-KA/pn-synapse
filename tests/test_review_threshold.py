@@ -5,14 +5,17 @@ app_module = importlib.import_module("synapse_app")
 app = getattr(app_module, "app")
 client = TestClient(app)
 
+
 def test_review_threshold_and_integrate():
     paper = {
-        "type":"Paper",
-        "id":"urn:pn:paper:unittest",
-        "title":"UnitTest",
-        "claims":[{"id":"urn:pn:claim:X","text":"X","topic":"demo"}],
-        "graphPatch":[{"op":"add","triple":["urn:pn:claim:X","supports","urn:pn:claim:X"]}],
-        "provenance":{"source":"test","license":"internal"}
+        "type": "Paper",
+        "id": "urn:pn:paper:unittest",
+        "title": "UnitTest",
+        "claims": [{"id": "urn:pn:claim:X", "text": "X", "topic": "demo"}],
+        "graphPatch": [
+            {"op": "add", "triple": ["urn:pn:claim:X", "supports", "urn:pn:claim:X"]}
+        ],
+        "provenance": {"source": "test", "license": "internal"},
     }
     r = client.post("/publish", json=paper)
     assert r.status_code == 202
@@ -21,7 +24,7 @@ def test_review_threshold_and_integrate():
         rv = {
             "paper_id": paper["id"],
             "reviewer": {"id": f"did:pn:axon:{i}"},
-            "vote": "approve"
+            "vote": "approve",
         }
         r = client.post("/review", json=rv)
         assert r.status_code == 200

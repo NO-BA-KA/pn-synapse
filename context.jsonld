@@ -1,0 +1,24 @@
+{
+  "@context": {
+    "pn": "https://pn.example/ns#",
+    "id": "@id",
+    "type": "@type",
+    "Claim": "pn:Claim",
+    "Paper": "pn:Paper",
+    "supports": {
+      "@id": "pn:supports",
+      "@type": "@id"
+    },
+    "refutes": {
+      "@id": "pn:refutes",
+      "@type": "@id"
+    },
+    "derivedFrom": {
+      "@id": "pn:derivedFrom",
+      "@type": "@id"
+    },
+    "text": "pn:text",
+    "topic": "pn:topic",
+    "evidence": "pn:evidence"
+  }
+}
