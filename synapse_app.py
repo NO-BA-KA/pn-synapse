@@ -1,11 +1,15 @@
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional, Literal
+import os
 from datetime import datetime, timezone
-import uuid
+from typing import Any, Dict, List, Literal, Optional
 
-app = FastAPI(title="PN Synapse Alpha", version="0.1.0")
+from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+# Local graph store for persistence
+import graph_store
+
+app = FastAPI(title="PN Synapse Alpha", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,13 +93,35 @@ class IntegrationResult(BaseModel):
     broadcast_event_id: Optional[str]
 
 
+# --- In-memory state (events + papers + reviews) ---
 db_papers: Dict[str, Paper] = {}
 db_reviews: Dict[str, List[Review]] = {}
 db_events: List[BroadcastEvent] = []
 
 
+def approvals_for(reviewer_id: str, topic: Optional[str]) -> int:
+    # Count previous APPROVE votes by this reviewer (optionally per topic).
+    count = 0
+    for _pid, revs in db_reviews.items():
+        for r in revs:
+            if r.reviewer.id == reviewer_id and r.vote == "approve":
+                if topic is None or r.topic == topic or topic == r.topic:
+                    count += 1
+    return count
+
+
 def weight_for(did: DID, topic: Optional[str]) -> float:
-    return 1.0
+    """
+    Heuristic trust weighting (MVP):
+      - Base = 1.0
+      - If topic is provided: +0.3
+      - Past approves by this reviewer on same topic: +0.1 each (cap total at 2.0)
+    """
+    base = 1.0
+    topic_bonus = 0.3 if topic else 0.0
+    prev = approvals_for(did.id, topic)
+    hist_bonus = min(prev * 0.1, 0.7)  # cap so base(1.0)+topic(0.3)+hist(0.7) <= 2.0
+    return min(base + topic_bonus + hist_bonus, 2.0)
 
 
 @app.get("/healthz")
@@ -117,7 +143,11 @@ def review(r: Review):
     if r.paper_id not in db_papers:
         raise HTTPException(404, "paper not found")
     if r.weight is None:
-        r.weight = weight_for(r.reviewer, r.topic)
+        # Compute BEFORE appending -> counts only previous approvals
+        topic = r.topic or (
+            db_papers[r.paper_id].claims[0].topic if db_papers[r.paper_id].claims else None
+        )
+        r.weight = weight_for(r.reviewer, topic)
     db_reviews[r.paper_id].append(r)
     tally = {"approve": 0.0, "reject": 0.0, "request_changes": 0.0}
     for rev in db_reviews[r.paper_id]:
@@ -126,28 +156,40 @@ def review(r: Review):
     return ReviewAck(paper_id=r.paper_id, accepted=accepted, tally=tally)
 
 
+def _gardener_ok(api_key: Optional[str]) -> bool:
+    secret = GARDENER_TOKEN_OVERRIDE or os.environ.get("GARDENER_TOKEN")
+    if not secret:
+        return True
+    return api_key == secret
+
+
 @app.post("/integrate/{paper_id}", response_model=IntegrationResult)
-def integrate(paper_id: str):
+def integrate(paper_id: str, x_api_key: Optional[str] = Header(default=None, alias="X-API-Key")):
+    if not _gardener_ok(x_api_key):
+        raise HTTPException(status_code=401, detail="unauthorized: invalid or missing X-API-Key")
+
     if paper_id not in db_papers:
         raise HTTPException(404, "paper not found")
+
     tally = {"approve": 0.0, "reject": 0.0, "request_changes": 0.0}
     for rev in db_reviews.get(paper_id, []):
         tally[rev.vote] += rev.weight or 0.0
     if not (tally["approve"] >= 3.0 and tally["reject"] < 1.5):
         raise HTTPException(400, "threshold not reached")
+
+    # Persist graph (apply patches)
+    patches = [gp.model_dump() for gp in (db_papers[paper_id].graphPatch or [])]
+    if patches:
+        graph_store.apply_patches(patches, db_papers[paper_id])
+
     evt = BroadcastEvent(
-        id=str(uuid.uuid4()),
+        id=os.urandom(8).hex(),
         kind="graph_patch",
-        payload={
-            "paper_id": paper_id,
-            "graphPatch": [gp.dict() for gp in (db_papers[paper_id].graphPatch or [])],
-        },
+        payload={"paper_id": paper_id, "graphPatch": patches},
         created_at=datetime.now(timezone.utc),
     )
     db_events.append(evt)
-    return IntegrationResult(
-        paper_id=paper_id, integrated=True, broadcast_event_id=evt.id
-    )
+    return IntegrationResult(paper_id=paper_id, integrated=True, broadcast_event_id=evt.id)
 
 
 @app.post("/broadcast")
@@ -166,4 +208,4 @@ def sync(since: Optional[str] = None):
         events = [e for e in db_events if e.created_at > t]
     else:
         events = db_events
-    return {"events": [e.dict() for e in events]}
+    return {"events": [e.model_dump() for e in events]}

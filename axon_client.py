@@ -1,6 +1,7 @@
-import requests
 import json
 from datetime import datetime, timezone
+
+import requests
 
 SYNAPSE = "http://localhost:8000"
 
@@ -14,9 +15,7 @@ def publish_sample():
             {"id": "urn:pn:claim:A", "text": "A is true", "topic": "demo"},
             {"id": "urn:pn:claim:B", "text": "B is true", "topic": "demo"},
         ],
-        "graphPatch": [
-            {"op": "add", "triple": ["urn:pn:claim:A", "supports", "urn:pn:claim:B"]}
-        ],
+        "graphPatch": [{"op": "add", "triple": ["urn:pn:claim:A", "supports", "urn:pn:claim:B"]}],
         "provenance": {
             "source": "demo",
             "license": "internal",

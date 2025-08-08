@@ -1,4 +1,5 @@
 import importlib
+
 from fastapi.testclient import TestClient
 
 app_module = importlib.import_module("synapse_app")
@@ -12,9 +13,7 @@ def test_review_threshold_and_integrate():
         "id": "urn:pn:paper:unittest",
         "title": "UnitTest",
         "claims": [{"id": "urn:pn:claim:X", "text": "X", "topic": "demo"}],
-        "graphPatch": [
-            {"op": "add", "triple": ["urn:pn:claim:X", "supports", "urn:pn:claim:X"]}
-        ],
+        "graphPatch": [{"op": "add", "triple": ["urn:pn:claim:X", "supports", "urn:pn:claim:X"]}],
         "provenance": {"source": "test", "license": "internal"},
     }
     r = client.post("/publish", json=paper)

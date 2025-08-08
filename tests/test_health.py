@@ -1,4 +1,5 @@
 import importlib
+
 from fastapi.testclient import TestClient
 
 app_module = importlib.import_module("synapse_app")
