@@ -9,6 +9,8 @@ from pydantic import BaseModel
 # Local graph store for persistence
 import graph_store
 
+GARDENER_TOKEN_OVERRIDE: Optional[str] = None
+
 app = FastAPI(title="PN Synapse Alpha", version="0.2.0")
 
 app.add_middleware(
