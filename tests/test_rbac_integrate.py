@@ -1,12 +1,15 @@
 import os
-import synapse_app
+
 from fastapi.testclient import TestClient
+
+import synapse_app
 
 # Force RBAC to require the key regardless of import timing
 os.environ["PN_DB"] = "test_rbac.db"
 
 app = synapse_app.app
 client = TestClient(app)
+
 
 def test_integrate_requires_api_key():
     synapse_app.GARDENER_TOKEN_OVERRIDE = "test-secret"
@@ -20,15 +23,18 @@ def test_integrate_requires_api_key():
     }
     assert client.post("/publish", json=p).status_code == 202
     for i in range(3):
-        assert client.post(
-            "/review",
-            json={
-                "paper_id": p["id"],
-                "reviewer": {"id": f"did:pn:{i}"},
-                "vote": "approve",
-                "topic": "rbac",
-            },
-        ).status_code == 200
+        assert (
+            client.post(
+                "/review",
+                json={
+                    "paper_id": p["id"],
+                    "reviewer": {"id": f"did:pn:{i}"},
+                    "vote": "approve",
+                    "topic": "rbac",
+                },
+            ).status_code
+            == 200
+        )
 
     # No key -> 401
     r = client.post(f"/integrate/{p['id']}")

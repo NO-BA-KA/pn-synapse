@@ -1,6 +1,9 @@
 import os
+
 import pytest
+
 import synapse_app
+
 
 @pytest.fixture(autouse=True)
 def reset_guard():

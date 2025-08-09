@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS claims (
@@ -16,15 +16,18 @@ CREATE TABLE IF NOT EXISTS edges (
 );
 """
 
+
 def _db_path() -> str:
     # Resolve each time so tests can switch PN_DB between modules
     return os.environ.get("PN_DB", "pn.db")
+
 
 def _conn():
     conn = sqlite3.connect(_db_path())
     # Always ensure schema exists (idempotent)
     conn.executescript(SCHEMA)
     return conn
+
 
 def apply_patches(patches: List[Dict[str, Any]], paper: Any) -> None:
     conn = _conn()
@@ -51,6 +54,7 @@ def apply_patches(patches: List[Dict[str, Any]], paper: Any) -> None:
                     "INSERT INTO edges(subj, pred, obj) VALUES(?,?,?)",
                     (s, pred, o),
                 )
+
 
 def count_edges() -> int:
     conn = _conn()
