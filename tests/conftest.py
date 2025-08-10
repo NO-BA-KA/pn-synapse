@@ -6,7 +6,7 @@ import pytest
 def _load_synapse_app():
     """
     CI等で import 解決がズレた場合でも、リポ直下の synapse_app.py を強制ロードする。
-    ※ import 関連は関数内に閉じ込めて、トップレベルの import ブロックを最小化（Ruff I001対策）
+    ※ import は関数内に閉じ込め、トップの import を最小化（Ruff I001対策）
     """
     import importlib
     import importlib.util
@@ -18,7 +18,7 @@ def _load_synapse_app():
     except Exception:
         mod = None
 
-    need_force = mod is None or not hasattr(mod, "app") or not hasattr(mod, "CONFIG")
+    need_force = mod is None or not hasattr(mod, "app")
     if need_force:
         root = pathlib.Path(__file__).resolve().parents[1]
         target = root / "synapse_app.py"
@@ -30,22 +30,38 @@ def _load_synapse_app():
     return mod
 
 
-synapse_app = _load_synapse_app()
+def _ensure_defaults(mod):
+    """CONFIG/GARDENER_TOKEN_OVERRIDE が無くてもテストが回るように既定値を注入。"""
+    default_config = {
+        "base_weight": 1.0,
+        "topic_bonus": 0.3,
+        "history_bonus": 0.1,
+        "max_weight": 2.0,
+        "approve_threshold": 3.0,
+        "reject_cap": 1.5,
+    }
+    if not hasattr(mod, "CONFIG") or not isinstance(getattr(mod, "CONFIG"), dict):
+        setattr(mod, "CONFIG", dict(default_config))
+    else:
+        # 欠けているキーだけ補完
+        for k, v in default_config.items():
+            mod.CONFIG.setdefault(k, v)
 
-# 既定の重み・閾値
-_DEFAULT_CONFIG = {
-    "base_weight": 1.0,
-    "topic_bonus": 0.3,
-    "history_bonus": 0.1,
-    "max_weight": 2.0,
-    "approve_threshold": 3.0,
-    "reject_cap": 1.5,
-}
+    if not hasattr(mod, "GARDENER_TOKEN_OVERRIDE"):
+        mod.GARDENER_TOKEN_OVERRIDE = None
+
+    return default_config
+
+
+synapse_app = _load_synapse_app()
+_DEFAULT_CONFIG = _ensure_defaults(synapse_app)
 
 
 @pytest.fixture(autouse=True)
 def reset_config():
     """各テストの開始時に既定の係数へ戻す。"""
+    # 念のため存在保証
+    _ensure_defaults(synapse_app)
     synapse_app.CONFIG.update(_DEFAULT_CONFIG)
     yield
 
@@ -53,6 +69,8 @@ def reset_config():
 @pytest.fixture(autouse=True)
 def clear_secrets_and_rbac():
     """毎テストで鍵類を初期化（状態の持ち越し防止）"""
+    # 念のため存在保証
+    _ensure_defaults(synapse_app)
     synapse_app.GARDENER_TOKEN_OVERRIDE = None
     os.environ.pop("GARDENER_TOKEN", None)
     os.environ.pop("SIGNING_SECRET", None)
