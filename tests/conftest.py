@@ -1,17 +1,18 @@
-import importlib
-import importlib.util
 import os
-import pathlib
-import sys
 
 import pytest
 
 
 def _load_synapse_app():
     """
-    CI 等で import 解決がズレた場合でも、リポ直下の synapse_app.py を強制ロードする。
+    CI等で import 解決がズレた場合でも、リポ直下の synapse_app.py を強制ロードする。
+    ※ import 関連は関数内に閉じ込めて、トップレベルの import ブロックを最小化（Ruff I001対策）
     """
-    mod = None
+    import importlib
+    import importlib.util
+    import pathlib
+    import sys
+
     try:
         mod = importlib.import_module("synapse_app")
     except Exception:
