@@ -2,61 +2,81 @@ import os
 import sqlite3
 from typing import Any, Dict, List
 
+DB_PATH = os.environ.get("PN_DB", "pn.db")
+
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS claims (
+PRAGMA journal_mode=WAL;
+CREATE TABLE IF NOT EXISTS claims(
   id TEXT PRIMARY KEY,
   text TEXT,
   topic TEXT
 );
-CREATE TABLE IF NOT EXISTS edges (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  subj TEXT NOT NULL,
-  pred TEXT NOT NULL,
-  obj TEXT NOT NULL
+CREATE TABLE IF NOT EXISTS edges(
+  id   INTEGER PRIMARY KEY AUTOINCREMENT,
+  subj TEXT,
+  pred TEXT,
+  obj  TEXT
 );
 """
 
 
-def _db_path() -> str:
-    # Resolve each time so tests can switch PN_DB between modules
-    return os.environ.get("PN_DB", "pn.db")
-
-
 def _conn():
-    conn = sqlite3.connect(_db_path())
-    # Always ensure schema exists (idempotent)
+    conn = sqlite3.connect(DB_PATH)
     conn.executescript(SCHEMA)
     return conn
 
 
-def apply_patches(patches: List[Dict[str, Any]], paper: Any) -> None:
+def apply_patches(patch: List[Dict[str, Any]], paper) -> None:
+    """graphPatch を DB に反映（add only, MVP）"""
     conn = _conn()
     with conn:
-        for c in paper.claims or []:
+        for op in patch or []:
+            if op.get("op") != "add":
+                continue
+            s, pred, o = op.get("triple") or [None, None, None]
+            if not (s and pred and o):
+                continue
+
+            # claims の存在保証（URNっぽいIDのみ）
+            for cid in (s, o):
+                if isinstance(cid, str) and cid.startswith("urn:pn:claim:"):
+                    c = None
+                    try:
+                        c = next(
+                            (cl for cl in (paper.claims or []) if getattr(cl, "id", None) == cid),
+                            None,
+                        )
+                    except Exception:
+                        c = None
+                    text = getattr(c, "text", None) if c else None
+                    topic = getattr(c, "topic", None) if c else None
+                    conn.execute(
+                        "INSERT OR IGNORE INTO claims(id, text, topic) VALUES(?,?,?)",
+                        (cid, text, topic),
+                    )
+
             conn.execute(
-                "INSERT OR IGNORE INTO claims(id, text, topic) VALUES(?,?,?)",
-                (c.id, c.text, c.topic),
+                "INSERT INTO edges(subj, pred, obj) VALUES(?,?,?)",
+                (s, pred, o),
             )
-        for p in patches:
-            if p.get("op") == "add":
-                s, pred, o = p["triple"]
-                if isinstance(s, str) and s.startswith("urn:pn:claim:"):
-                    conn.execute(
-                        "INSERT OR IGNORE INTO claims(id, text, topic) VALUES(?,?,?)",
-                        (s, None, None),
-                    )
-                if isinstance(o, str) and o.startswith("urn:pn:claim:"):
-                    conn.execute(
-                        "INSERT OR IGNORE INTO claims(id, text, topic) VALUES(?,?,?)",
-                        (o, None, None),
-                    )
-                conn.execute(
-                    "INSERT INTO edges(subj, pred, obj) VALUES(?,?,?)",
-                    (s, pred, o),
-                )
 
 
 def count_edges() -> int:
-    conn = _conn()
-    (n,) = conn.execute("SELECT COUNT(*) FROM edges").fetchone()
+    (n,) = _conn().execute("SELECT COUNT(*) FROM edges").fetchone()
     return int(n)
+
+
+def list_edges(limit: int = 1000) -> List[Dict[str, str]]:
+    cur = _conn().execute("SELECT subj, pred, obj FROM edges LIMIT ?", (limit,))
+    return [{"subj": s, "pred": p, "obj": o} for (s, p, o) in cur.fetchall()]
+
+
+def list_claims(limit: int = 1000) -> List[Dict[str, str]]:
+    cur = _conn().execute("SELECT id, text, topic FROM claims LIMIT ?", (limit,))
+    return [{"id": i, "text": t, "topic": topic} for (i, t, topic) in cur.fetchall()]
+
+
+def debug_info() -> Dict[str, Any]:
+    exists = os.path.exists(DB_PATH)
+    size = os.path.getsize(DB_PATH) if exists else 0
+    return {"db_path": DB_PATH, "exists": exists, "size": size, "edges": count_edges()}
