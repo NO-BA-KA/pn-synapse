@@ -1,9 +1,11 @@
-import os
-import sys
-import pathlib
 import importlib
 import importlib.util
+import os
+import pathlib
+import sys
+
 import pytest
+
 
 def _load_synapse_app():
     """
@@ -15,11 +17,7 @@ def _load_synapse_app():
     except Exception:
         mod = None
 
-    need_force = (
-        mod is None
-        or not hasattr(mod, "app")
-        or not hasattr(mod, "CONFIG")
-    )
+    need_force = mod is None or not hasattr(mod, "app") or not hasattr(mod, "CONFIG")
     if need_force:
         root = pathlib.Path(__file__).resolve().parents[1]
         target = root / "synapse_app.py"
@@ -29,6 +27,7 @@ def _load_synapse_app():
         assert spec and spec.loader
         spec.loader.exec_module(mod)  # type: ignore
     return mod
+
 
 synapse_app = _load_synapse_app()
 
@@ -42,11 +41,13 @@ _DEFAULT_CONFIG = {
     "reject_cap": 1.5,
 }
 
+
 @pytest.fixture(autouse=True)
 def reset_config():
     """各テストの開始時に既定の係数へ戻す。"""
     synapse_app.CONFIG.update(_DEFAULT_CONFIG)
     yield
+
 
 @pytest.fixture(autouse=True)
 def clear_secrets_and_rbac():
